@@ -1,66 +1,49 @@
-FROM ubuntu:16.04
+FROM debian:sid
 
-ENV SCREEN_COLOUR_DEPTH 24
-ENV SCREEN_HEIGHT 1080
-ENV SCREEN_WIDTH 1920
+ENV DEBIAN_FRONTEND noninteractive
 
+RUN apt-get update && \
+  apt-get install -y \
+    supervisor \
+    netcat-traditional \
+    xvfb \
+    openjdk-8-jre \
+    chromium \
+    firefox \
+    ffmpeg \
+    curl \
+    gnupg \
+  && \
+  apt-get clean && \
+  rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update -y
-RUN apt-get upgrade -y
-RUN apt -f install -y
+RUN curl -sL https://deb.nodesource.com/setup_8.x | bash - && \
+  apt-get update && \
+  apt-get install -y nodejs && \
+  apt-get clean && \
+  rm -rf /var/lib/apt/lists/*
 
-RUN apt-get install -y wget sudo
-RUN apt-get install -y firefox
-RUN apt-get install -y libxss1 libappindicator1 libindicator7
+# Install Protractor and initialized Webdriver
+RUN npm install -g protractor@5.3 && \
+  webdriver-manager update
 
-RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add - 
-RUN sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
-RUN apt-get update -y
+# Add a non-privileged user for running Protrator
+RUN adduser --home /project --uid 1000 \
+  --disabled-login --disabled-password --gecos node node
 
-RUN apt-get install -y google-chrome-stable
+# Add main configuration file
+ADD supervisord.conf /etc/supervisor/supervisor.conf
 
-RUN apt-get install xvfb -y
-RUN chmod +x /usr/bin/xvfb-run
-RUN mkdir /opt/protractor
-RUN mkdir /opt/protractor/bin
+# Add service defintions for Xvfb, Selenium and Protractor runner
+ADD supervisord/*.conf /etc/supervisor/conf.d/
 
-RUN apt-get install unzip
-RUN wget -N http://chromedriver.storage.googleapis.com/2.39/chromedriver_linux64.zip -P ~/
-RUN unzip ~/chromedriver_linux64.zip -d ~/
-RUN rm ~/chromedriver_linux64.zip
-RUN mv -f ~/chromedriver /usr/local/bin/chromedriver
-RUN chown root:root /usr/local/bin/chromedriver
-RUN chmod 0755 /usr/local/bin/chromedriver
-#RUN ln -s /usr/local/share/chromedriver /usr/local/bin/chromedriver
-#RUN ln -s /usr/local/share/chromedriver /usr/bin/chromedriver
+# By default, tests in /data directory will be executed once and then the container
+# will quit. When MANUAL envorinment variable is set when starting the container,
+# tests will NOT be executed and Xvfb and Selenium will keep running.
+ADD bin/run-protractor /usr/local/bin/run-protractor
+ADD bin/run-webdriver /usr/local/bin/run-webdriver
 
-RUN apt-get install -y libgconf-2-4
+# Container's entry point, executing supervisord in the foreground
+CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/supervisor.conf"]
 
-
-
-# RUN mv /usr/lib/chromium-browser/chromium-browser /usr/lib/chromium-browser/chromium-browser-original \
-#   && ln -sfv /opt/protractor/bin/chromium-browser /usr/lib/chromium-browser/chromium-browser
-
-RUN apt-get install -y curl bash
-
-RUN curl --silent --location https://deb.nodesource.com/setup_10.x | sudo bash - && \
-    apt-get install -y nodejs
-
-RUN nodejs -v
-RUN npm -v
-
-RUN npm i -g protractor --save-dev && \
-    webdriver-manager update --versions.chrome 2.39 && \
-    npm i jasmine-spec-reporter --save-dev
-
-ENV PATH=/opt/protractor/bin:$PATH
-
-COPY protractor.sh /opt/protractor/bin/
-COPY chromedriver.sh /opt/protractor/bin/chromedriver
-COPY chromium-browser.sh /opt/protractor/bin/chromium-browser
-COPY . /opt/protractor/
-
-RUN npm install -g typescript 
-RUN npm i -g ts-node
-
-CMD ["sh", "/opt/protractor/bin/protractor.sh"]
+# Protractor test project needs to be mounted at /project
