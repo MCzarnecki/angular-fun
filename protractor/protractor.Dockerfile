@@ -43,13 +43,13 @@ RUN apt-get install -y libgconf-2-4
 
 RUN apt-get install -y curl bash
 
-RUN curl --silent --location https://deb.nodesource.com/setup_8.x | sudo bash - && \
+RUN curl --silent --location https://deb.nodesource.com/setup_10.x | sudo bash - && \
     apt-get install -y nodejs
 
 RUN nodejs -v
 RUN npm -v
 
-RUN npm i -g protractor && \
+RUN npm i -g protractor --save-dev && \
     webdriver-manager update --versions.chrome 2.39 && \
     npm i jasmine-spec-reporter --save-dev
 
@@ -60,9 +60,7 @@ COPY chromedriver.sh /opt/protractor/bin/chromedriver
 COPY chromium-browser.sh /opt/protractor/bin/chromium-browser
 COPY . /opt/protractor/
 
-RUN npm i /opt/protractor/
-
-RUN npm install --save-dev ts-node
-RUN npm install --save-dev typescript
+RUN npm install -g typescript 
+RUN npm i -g ts-node
 
 CMD ["sh", "/opt/protractor/bin/protractor.sh"]
