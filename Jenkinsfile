@@ -9,7 +9,7 @@ node {
 
         stage('Run protractor tests') {
             dir('angular-fun') {
-                sh 'docker run -it --privileged --rm --net=host -v /dev/shm:/dev/shm -v $(pwd):/protractor webnicer/protractor-headless e2e/protractor.conf.js'
+                sh 'docker run --privileged --rm --net=host -v /dev/shm:/dev/shm -v $(pwd):/protractor webnicer/protractor-headless e2e/protractor.conf.js'
             }
         }
 
